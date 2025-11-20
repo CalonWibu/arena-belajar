@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arena Belajar: Pertarungan Monster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="database_soal.js" onerror="console.warn('Database tidak ditemukan, menggunakan fallback.')"></script>
+
+    <style>
+        /* 0. LAYOUT UTAMA */
+        html, body { overflow: hidden; height: 100%; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .h-screen-fixed { height: 100vh; position: relative; }
+        
+        .invisible-layout { opacity: 0; pointer-events: none; height: 0; padding: 0 !important; margin: 0 !important; border: none !important; overflow: hidden; }
+        .arena-bg { background-image: url('bgarena.png'); background-color: #e0f2fe; background-position: bottom center; background-size: 100% auto; background-repeat: no-repeat; min-height: 100vh; }
+        @media (min-width: 1024px) { .arena-bg { background-size: cover; background-position: center bottom 50%; } }
+
+        /* 1. ANIMASI & POSISI (MONSTER DIKUNCI ABSOLUTE DI BAWAH) */
+        #battle-panel {
+            position: absolute; 
+            bottom: 100px; 
+            left: 0; 
+            right: 0;
+            z-index: 10;
+        }
+
+        .monster-container-relative { 
+            position: relative; 
+            transition: transform 1s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 1s ease; 
+        }
+        
+        .monster-start-left { transform: translateX(-150%); opacity: 0; }
+        .monster-start-right { transform: translateX(150%); opacity: 0; }
+
+        /* Shake Effects */
+        .shake { animation: shake 0.4s; }
+        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-5px) rotate(-5deg); } 50% { transform: translateX(5px) rotate(5deg); } 75% { transform: translateX(-5px) rotate(-5deg); } 100% { transform: translateX(0); } }
+        #enemy-monster.shake .monster-image { animation: shake-enemy 0.4s; }
+        @keyframes shake-enemy { 0% { transform: scaleX(-1) translateX(0); } 25% { transform: scaleX(-1) translateX(5px) rotate(5deg); } 50% { transform: scaleX(-1) translateX(-5px) rotate(-5deg); } 75% { transform: scaleX(-1) translateX(5px) rotate(5deg); } 100% { transform: scaleX(-1) translateX(0); } }
+
+        /* 2. UI ELEMENTS */
+        #question-answer-area { position: relative; z-index: 30; transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55), opacity 0.5s ease; }
+        .slide-up { transform: translateY(-150%); opacity: 0; }
+        .intro-hidden { opacity: 0; transform: translateY(30px); }
+        
+        #feedback-message { position: fixed; top: 0; left: 0; width: 100%; z-index: 70; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); transform: translateY(-100%); transition: transform 0.5s ease-out; }
+        #feedback-message.show { transform: translateY(0); }
+
+        .question-wrapper { background-color: #2563EB; border-radius: 1rem; padding: 10px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); transition: all 0.3s ease; }
+        .question-box { background-color: white; border: 5px solid white; border-radius: 0.75rem; box-shadow: 0 0 0 2px #2563EB; }
+        
+        /* Container Jawaban dengan Scroll */
+        #answers-container-wrapper { 
+            max-height: 45vh; /* Batas tinggi */
+            overflow-y: auto; 
+            padding-right: 5px; 
+            padding-bottom: 20px; 
+            scrollbar-width: thin; 
+            position: relative;
+        }
+
+        /* Projectiles */
+        .attack-effect { position: absolute; font-size: 2em; font-weight: bold; color: #facc15; text-shadow: 0 0 5px red; animation: floatup 1.5s forwards; pointer-events: none; z-index: 20; }
+        @keyframes floatup { 0% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -80px); } }
+        .projectile { position: absolute; width: 48px; height: 48px; border-radius: 50%; z-index: 40; display: flex; align-items: center; justify-content: center; font-size: 2em; top: 55%; }
+        .projectile.user-attack { left: 25%; animation: shoot-forward 0.6s forwards linear; }
+        @keyframes shoot-forward { 0% { left: 25%; opacity: 0; transform: scale(0.5); } 20% { opacity: 1; transform: scale(1); } 100% { left: 70%; opacity: 0; transform: scale(1.2); } }
+        .projectile.enemy-attack { right: 25%; animation: shoot-backward 0.6s forwards linear; }
+        @keyframes shoot-backward { 0% { right: 25%; opacity: 0; transform: scale(0.5); } 20% { opacity: 1; transform: scale(1); } 100% { right: 70%; opacity: 0; transform: scale(1.2); } }
+        
+        .fireball-effect { background: radial-gradient(circle, #ff0000, #ff8c00); box-shadow: 0 0 15px 5px #ff4500; }
+        .lightning-effect { background: #ffff00; box-shadow: 0 0 20px 5px #00ffff; border-radius: 0; transform: rotate(45deg); }
+        .ice-effect { background: #e0f2fe; box-shadow: 0 0 15px 5px #38bdf8; border-radius: 10%; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .damage-info-absolute { position: absolute; bottom: -40px; width: 100%; text-align: center; font-size: 0.9em; font-weight: 800; color: #f97316; pointer-events: none; text-shadow: 1px 1px 0 #fff; }
+
+        #timer-container {
+            position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 55;
+            background: rgba(255, 255, 255, 0.9); padding: 8px 20px; border-radius: 20px;
+            font-weight: 800; font-size: 1.2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: 2px solid #3b82f6; color: #1e40af;
+        }
+        .timer-warning { background: #fee2e2 !important; color: #991b1b !important; border-color: #ef4444 !important; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.05); } 100% { transform: translateX(-50%) scale(1); } }
+    </style>
+</head>
+<body class="arena-bg text-gray-800">
+
+    <div id="timer-container" class="hidden">
+        ⏳ <span id="timer-text">00:00</span>
+    </div>
+
+    <div id="feedback-message" class="text-white p-4 hidden font-bold text-center shadow-lg">
+        <span id="feedback-text"></span>
+    </div>
+    
+    <div class="h-screen-fixed w-full px-4 py-2 sm:py-4"> 
+        
+        <div id="question-answer-area" class="w-full max-w-4xl mx-auto mt-16 sm:mt-20 transition-all duration-500 intro-hidden relative"> 
+            
+            <div id="question-wrapper-block" class="question-wrapper mb-4">
+                <div id="question-text-box" class="question-box text-lg sm:text-xl leading-relaxed relative p-6 font-semibold min-h-[100px] flex items-center">
+                    Memuat Soal...
+                </div>
+            </div>
+
+            <div class="relative">
+                <div id="answers-container-wrapper" class="pb-8"> 
+                    <div id="answers-container" class="space-y-3"></div>
+                </div>
+
+                <div id="scroll-indicator" class="hidden absolute bottom-0 left-0 right-0 flex justify-center pb-2 pointer-events-none z-20 bg-gradient-to-t from-blue-100/80 to-transparent pt-6 rounded-b-lg">
+                    <span class="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md animate-bounce">
+                        ▼ Scroll untuk opsi lain
+                    </span>
+                </div>
+            </div>
+            
+        </div>
+
+        <div id="battle-panel" class="w-full max-w-5xl mx-auto flex justify-between items-end pointer-events-none"> 
+            <div id="user-monster" class="flex flex-col items-center w-1/2 pr-4 monster-container-relative monster-start-left">
+                <img id="user-img" src="kadal_oranye.png" alt="Monster User" class="monster-image h-32 w-32 sm:h-48 sm:w-48 object-contain transform scale-x-100 drop-shadow-xl">
+                <span id="user-damage-info" class="damage-info-absolute hidden"></span>
+            </div>
+            <div id="enemy-monster" class="flex flex-col items-center w-1/2 pl-4 monster-container-relative monster-start-right">
+                <img id="enemy-img" src="kadal_oranye.png" alt="Monster Musuh" class="monster-image h-32 w-32 sm:h-48 sm:w-48 object-contain transform scale-x-[-1] drop-shadow-xl"> 
+                <span id="enemy-damage-info" class="damage-info-absolute hidden"></span>
+            </div>
+        </div>
+        
+        <div id="darah-bar" class="fixed bottom-0 left-0 right-0 z-50 w-full max-w-4xl mx-auto">
+            <div class="bg-white rounded-t-3xl shadow-[0_-5px_20px_rgba(0,0,0,0.15)] px-6 py-4 border-t border-gray-100">
+                <div class="flex justify-between items-center">
+                    <div class="flex flex-col w-[45%]">
+                        <div class="flex justify-between text-xs font-bold mb-1 px-1">
+                            <span class="text-blue-600">KAMU</span>
+                            <span id="user-health-percent">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-3 sm:h-4 overflow-hidden relative">
+                            <div id="user-health-bar" class="bg-lime-500 h-full health-bar-inner absolute top-0 left-0" style="width: 0%;"></div> 
+                        </div>
+                    </div>
+                    <div class="font-black text-gray-300 italic text-xl mx-2">VS</div>
+                    <div class="flex flex-col w-[45%]">
+                        <div class="flex justify-between text-xs font-bold mb-1 px-1">
+                            <span id="enemy-health-percent">0%</span>
+                            <span class="text-red-600">LAWAN</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-3 sm:h-4 overflow-hidden relative">
+                            <div id="enemy-health-bar" class="bg-lime-500 h-full health-bar-inner absolute top-0 left-0" style="width: 0%;"></div> 
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // DATA DEFAULT
+        const DEFAULT_DATA = [{ mapel: "default", materi: "umum", question: "1 + 1 = ?", options: [{ text: "2", isCorrect: true, label: "A" }, { text: "11", isCorrect: false, label: "B" }], damage: 20, type: 'api', explanation: "1 + 1 adalah 2." }];
+        const ENEMY_ATTACK_DATA = { damage: 10, type: 'api' };
+        
+        // STATE
+        let questions = []; 
+        let currentQuestionIndex = 0;
+        let userHealth = 0;
+        let enemyHealth = 0;
+        let isAttacking = false; 
+        let feedbackTimer; 
+        let timerInterval;
+        let totalTimeSeconds = 0;
+        let correctCount = 0;
+        let wrongCount = 0;
+
+        // DOM ELEMENTS
+        const questionWrapperBlock = document.getElementById('question-wrapper-block');
+        const questionTextBox = document.getElementById('question-text-box');
+        const answersContainer = document.getElementById('answers-container');
+        const answersWrapper = document.getElementById('answers-container-wrapper'); // Wrapper Scroll
+        const scrollIndicator = document.getElementById('scroll-indicator'); // Indikator Baru
+        const questionAnswerArea = document.getElementById('question-answer-area'); 
+        const userHealthBar = document.getElementById('user-health-bar');
+        const enemyHealthBar = document.getElementById('enemy-health-bar');
+        const userHealthPercent = document.getElementById('user-health-percent');
+        const enemyHealthPercent = document.getElementById('enemy-health-percent');
+        const feedbackMessage = document.getElementById('feedback-message');
+        const feedbackText = document.getElementById('feedback-text');
+        const battlePanel = document.getElementById('battle-panel'); 
+        const userMonster = document.getElementById('user-monster');
+        const enemyMonster = document.getElementById('enemy-monster');
+        const userDamageInfo = document.getElementById('user-damage-info');
+        const enemyDamageInfo = document.getElementById('enemy-damage-info');
+        const timerContainer = document.getElementById('timer-container');
+        const timerText = document.getElementById('timer-text');
+
+        // --- SCROLL INDICATOR LOGIC ---
+        function checkScroll() {
+            if (answersWrapper.scrollHeight > answersWrapper.clientHeight) {
+                if (answersWrapper.scrollTop + answersWrapper.clientHeight >= answersWrapper.scrollHeight - 5) {
+                    scrollIndicator.classList.add('hidden');
+                } else {
+                    scrollIndicator.classList.remove('hidden');
+                }
+            } else {
+                scrollIndicator.classList.add('hidden');
+            }
+        }
+        answersWrapper.addEventListener('scroll', checkScroll);
+
+        // INIT
+        function initGame() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mapel = urlParams.get('mapel') || 'umum';
+            const materiParam = urlParams.get('materi'); 
+            const jumlahSoal = parseInt(urlParams.get('jumlah')) || 10;
+            const waktuMenit = parseInt(urlParams.get('waktu')) || 0; 
+
+            if (typeof DATABASE_SOAL === 'undefined') {
+                console.warn("Database tidak ditemukan. Menggunakan Default.");
+                loadDataFallback(jumlahSoal, waktuMenit);
+            } else if (!DATABASE_SOAL[mapel]) {
+                if(DATABASE_SOAL['umum']) loadData('umum', materiParam, jumlahSoal, waktuMenit);
+                else loadDataFallback(jumlahSoal, waktuMenit);
+            } else {
+                loadData(mapel, materiParam, jumlahSoal, waktuMenit);
+            }
+        }
+
+        function loadDataFallback(jumlah, waktu) {
+            questions = DEFAULT_DATA; 
+            if (waktu > 0) { totalTimeSeconds = waktu * 60; timerContainer.classList.remove('hidden'); startTimer(); }
+            startIntroAnimation();
+        }
+
+        function loadData(mapel, materiParam, jumlahSoal, waktuMenit) {
+            let rawData = DATABASE_SOAL[mapel];
+            
+            // FILTER MATERI (MULTIPLE)
+            if (materiParam) {
+                // Decode URI component untuk menangani spasi (%20) dll
+                // Split berdasarkan koma
+                const materiList = decodeURIComponent(materiParam).split(',').map(m => m.trim().toLowerCase());
+                
+                // Filter soal yang materinya ada di dalam list yang dipilih
+                const filtered = rawData.filter(q => materiList.includes(q.materi.toLowerCase()));
+                
+                if(filtered.length > 0) rawData = filtered;
+                else console.warn("Materi tidak ditemukan, menggunakan semua soal mapel.");
+            }
+
+            // Randomize
+            let shuffled = [...rawData];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            
+            // Limit Jumlah
+            questions = shuffled.slice(0, jumlahSoal);
+            
+            // Timer Setup
+            if (waktuMenit > 0) { 
+                totalTimeSeconds = waktuMenit * 60; 
+                timerContainer.classList.remove('hidden'); 
+                startTimer(); 
+            }
+            
+            startIntroAnimation();
+        }
+
+        function startIntroAnimation() {
+            setTimeout(() => {
+                userMonster.classList.remove('monster-start-left');
+                enemyMonster.classList.remove('monster-start-right');
+            }, 300);
+            setTimeout(() => {
+                userHealth = 100;
+                enemyHealth = 100;
+                updateHealthBars();
+            }, 1200);
+            setTimeout(() => {
+                loadQuestion();
+                questionAnswerArea.classList.remove('intro-hidden');
+            }, 2700);
+        }
+
+        function startTimer() {
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                totalTimeSeconds--;
+                updateTimerDisplay();
+                if (totalTimeSeconds <= 0) { clearInterval(timerInterval); endGame(false, true); }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(totalTimeSeconds / 60);
+            const seconds = totalTimeSeconds % 60;
+            timerText.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            if (totalTimeSeconds <= 10) timerContainer.classList.add('timer-warning');
+        }
+
+        function showFeedback(text, isCorrect) {
+            clearTimeout(feedbackTimer);
+            feedbackText.textContent = text;
+            feedbackMessage.classList.remove('hidden', 'bg-red-500', 'bg-green-500');
+            feedbackMessage.classList.add(isCorrect ? 'bg-green-500' : 'bg-red-500');
+            setTimeout(() => feedbackMessage.classList.add('show'), 10);
+            feedbackTimer = setTimeout(hideFeedback, 2500);
+        }
+
+        function hideFeedback() {
+            feedbackMessage.classList.remove('show');
+            setTimeout(() => feedbackMessage.classList.add('hidden'), 500);
+        }
+
+        function updateHealthBars() {
+            let dhUser = Math.max(0, userHealth);
+            let dhEnemy = Math.max(0, enemyHealth);
+            userHealthBar.style.width = dhUser + '%';
+            enemyHealthBar.style.width = dhEnemy + '%';
+            userHealthPercent.textContent = dhUser + '%';
+            enemyHealthPercent.textContent = dhEnemy + '%';
+            userHealthBar.className = `h-full health-bar-inner absolute top-0 left-0 ${dhUser < 30 && dhUser > 0 ? 'bg-red-500' : 'bg-lime-500'}`;
+            enemyHealthBar.className = `h-full health-bar-inner absolute top-0 left-0 ${dhEnemy < 30 && dhEnemy > 0 ? 'bg-red-500' : 'bg-lime-500'}`;
+        }
+
+        function loadQuestion() {
+            if (currentQuestionIndex >= questions.length || enemyHealth <= 0 || userHealth <= 0) {
+                 clearInterval(timerInterval); 
+                 if(currentQuestionIndex >= questions.length && userHealth > 0 && enemyHealth > 0) endGame(true, false); 
+                 else endGame(enemyHealth <= 0, false); 
+                 return;
+            }
+
+            questionAnswerArea.classList.remove('slide-up');
+            questionWrapperBlock.classList.remove('invisible-layout'); 
+            const q = questions[currentQuestionIndex];
+            questionTextBox.textContent = q.question;
+            answersContainer.innerHTML = '';
+            isAttacking = false; 
+            scrollIndicator.classList.add('hidden'); 
+
+            q.options.forEach(option => {
+                const btn = document.createElement('div');
+                btn.className = 'bg-white p-4 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition duration-150 text-gray-700 flex items-center group pointer-events-auto relative';
+                btn.innerHTML = `<span class="font-bold text-blue-600 bg-blue-100 px-3 py-1 rounded-lg mr-3 group-hover:bg-blue-600 group-hover:text-white transition">${option.label}</span> <span class="font-medium text-lg">${option.text}</span>`;
+                btn.dataset.isCorrect = option.isCorrect;
+                btn.addEventListener('click', handleAttack);
+                answersContainer.appendChild(btn);
+            });
+
+            setTimeout(checkScroll, 100);
+        }
+
+        function handleAttack(event) {
+            if (isAttacking) return;
+            isAttacking = true; 
+            const clickedBtn = event.currentTarget;
+            const isCorrect = clickedBtn.dataset.isCorrect === 'true';
+            const currentQ = questions[currentQuestionIndex];
+            Array.from(answersContainer.children).forEach(child => child.style.pointerEvents = 'none');
+            scrollIndicator.classList.add('hidden');
+
+            if (isCorrect) {
+                correctCount++;
+                clickedBtn.classList.replace('border-gray-200', 'border-green-500');
+                clickedBtn.classList.add('bg-green-50');
+                showFeedback(`✅ Bagus! Serangan ${currentQ.type} diluncurkan!`, true);
+                createProjectile(currentQ.type, currentQ.damage, false); 
+            } else {
+                wrongCount++;
+                clickedBtn.classList.replace('border-gray-200', 'border-red-500');
+                clickedBtn.classList.add('bg-red-50');
+                showFeedback('❌ Salah! Bersiap menerima serangan!', false);
+                setTimeout(() => {
+                    createProjectile(ENEMY_ATTACK_DATA.type, ENEMY_ATTACK_DATA.damage, true); 
+                }, 800); 
+            }
+        }
+
+        function createProjectile(type, damage, isEnemyAttack) {
+            questionAnswerArea.classList.add('slide-up');
+            const projectile = document.createElement('div');
+            projectile.classList.add('projectile');
+            if (isEnemyAttack) projectile.classList.add('enemy-attack'); else projectile.classList.add('user-attack');
+
+            let emoji = '💥';
+            if (type === 'api') { projectile.classList.add('fireball-effect'); emoji = '🔥'; } 
+            else if (type === 'petir') { projectile.classList.add('lightning-effect'); emoji = '⚡'; } 
+            else if (type === 'es') { projectile.classList.add('ice-effect'); emoji = '❄️'; } 
+            projectile.textContent = emoji;
+            battlePanel.appendChild(projectile); 
+
+            setTimeout(() => {
+                const targetMonster = isEnemyAttack ? userMonster : enemyMonster;
+                const isTargetUser = isEnemyAttack;
+                if (isEnemyAttack) userHealth -= damage; else enemyHealth -= damage;
+                updateHealthBars();
+                targetMonster.classList.add('shake');
+                showDamageInfo(targetMonster, damage, isTargetUser); 
+                
+                setTimeout(() => {
+                    projectile.remove();
+                    targetMonster.classList.remove('shake');
+                    if (userHealth <= 0 || enemyHealth <= 0) {
+                        clearInterval(timerInterval);
+                        endGame(enemyHealth <= 0, false);
+                    } else {
+                        showExplanation();
+                    }
+                }, 500); 
+            }, 600); 
+        }
+
+        function showDamageInfo(target, damage, isUser) {
+             const infoEl = isUser ? userDamageInfo : enemyDamageInfo;
+             infoEl.textContent = `-${damage}`;
+             infoEl.classList.remove('hidden');
+             const floatText = document.createElement('div');
+             floatText.textContent = `-${damage}`;
+             floatText.className = 'attack-effect';
+             floatText.style.left = isUser ? '30%' : '70%'; 
+             floatText.style.top = '50%';
+             battlePanel.appendChild(floatText);
+             setTimeout(() => { infoEl.classList.add('hidden'); floatText.remove(); }, 1500);
+        }
+
+        function showExplanation() {
+            const currentQ = questions[currentQuestionIndex];
+            const correctOption = currentQ.options.find(opt => opt.isCorrect);
+            questionAnswerArea.classList.remove('slide-up');
+            questionWrapperBlock.classList.add('invisible-layout');
+            answersContainer.innerHTML = `
+                <div class="animate-fade-in w-full space-y-4 pt-2 pb-4">
+                    <div class="bg-lime-400 p-4 rounded-2xl text-black shadow-md flex items-start border-r-4 border-lime-600 relative">
+                        <span class="font-bold text-xl mr-4 bg-white/40 px-3 py-1 rounded-lg min-w-[3rem] text-center">${correctOption.label}</span>
+                        <span class="font-bold text-lg self-center leading-tight">${correctOption.text}</span>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 text-left relative">
+                        <h3 class="font-bold text-gray-800 text-lg mb-3 border-b border-gray-100 pb-2">Penjelasan</h3>
+                        <p class="text-gray-600 text-base leading-relaxed text-justify">${currentQ.explanation}</p>
+                    </div>
+                    <button id="next-btn" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg shadow-lg shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] active:scale-95 transition transform duration-200 flex justify-center items-center mt-4 pointer-events-auto">
+                        Selanjutnya <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                    </button>
+                </div>
+            `;
+            setTimeout(checkScroll, 100);
+            document.getElementById('next-btn').onclick = () => {
+                currentQuestionIndex++;
+                questionAnswerArea.classList.add('slide-up'); 
+                setTimeout(loadQuestion, 500);
+            };
+        }
+
+        function endGame(isWin, isTimeout) {
+            isAttacking = true;
+            clearInterval(timerInterval); 
+            
+            let totalAnswered = correctCount + wrongCount;
+            let totalScore = 0;
+            if (totalAnswered > 0) {
+                totalScore = Math.round((correctCount / totalAnswered) * 100);
+            }
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const currentMapel = urlParams.get('mapel') || 'umum';
+            const storageKey = 'arena_belajar_progress';
+            let savedData = JSON.parse(localStorage.getItem(storageKey)) || {};
+
+            if (!savedData[currentMapel]) {
+                savedData[currentMapel] = { total_soal: 0, total_benar: 0, total_salah: 0 };
+            }
+            savedData[currentMapel].total_soal += totalAnswered;
+            savedData[currentMapel].total_benar += correctCount;
+            savedData[currentMapel].total_salah += wrongCount;
+            localStorage.setItem(storageKey, JSON.stringify(savedData));
+
+            setTimeout(() => {
+                window.location.href = `evaluasi.html?mapel=${currentMapel}&benar=${correctCount}&salah=${wrongCount}&skor=${totalScore}&status=${isTimeout ? 'timeout' : (isWin ? 'win' : 'lose')}`;
+            }, 500); 
+        }
+        initGame();
+    </script>
+</body>
+</html>

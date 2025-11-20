@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pilih Materi</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
+    <style>
+        /* --- CSS SAMA SEPERTI SEBELUMNYA --- */
+        .header-bg { background-color: #006EDF; }
+        .start-button { background-color: #006EDF; box-shadow: 0 4px 10px rgba(0, 110, 223, 0.4); }
+        .start-button:hover { background-color: #005bb7; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        .background-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+        .icon { position: absolute; font-size: 30px; color: rgba(52, 152, 219, 0.4); opacity: 0.8; user-select: none; line-height: 1; animation: float 20s infinite ease-in-out alternate; transform: translate(0, 0) rotate(0deg); }
+        .icon.bi { font-family: "bootstrap-icons" !important; font-weight: normal !important; }
+        @keyframes float { 0% { transform: translate(0, 0) rotate(0deg); opacity: 0.8; } 50% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0.6; } 100% { transform: translate(0, 0) rotate(0deg); opacity: 0.8; } }
+        .flag-id { width: 24px; height: 16px; position: relative; overflow: hidden; border-radius: 3px; }
+        .flag-id::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 50%; background-color: #EE243A; }
+        .flag-id::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 50%; background-color: #FFFFFF; }
+        .materi-options { max-height: 250px; overflow-y: auto; -ms-overflow-style: none; scrollbar-width: none; }
+        .materi-options::-webkit-scrollbar { display: none; }
+        input[type="checkbox"]:checked { background-color: #2ecc71; border-color: #2ecc71; }
+        input[type="checkbox"]:focus { ring: 0; }
+        .progress-container { display: flex; flex-direction: column; align-items: flex-end; width: 100%; margin-top: 5px; }
+        .progress-bar { width: 100%; height: 10px; background-color: #eee; border-radius: 5px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 5px; transition: width 0.5s ease-out; }
+        .bg-progress-green { background-color: #2ecc71; }
+        .bg-progress-yellow { background-color: #f1c40f; }
+        .bg-progress-red { background-color: #e74c3c; }
+        .text-progress-red { color: #e74c3c; }
+    </style>
+</head>
+<body class="bg-[#f4f4f9]">
+
+    <div class="background-container" id="backgroundContainer"></div>
+
+    <div class="relative min-h-screen flex items-center justify-center p-4">
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[800px] flex flex-col items-center pt-[50px] z-10">
+            <div class="header-bg absolute top-[-20px] w-[150%] h-[250px] rounded-[40px] shadow-xl z-0"></div>
+            
+            <div class="relative bg-white rounded-xl shadow-2xl w-full p-5 z-10">
+                
+                <div class="flex flex-col sm:flex-row items-center justify-between pb-4 mb-5 border-b border-gray-200">
+                    <div class="flex items-center gap-4 mb-4 sm:mb-0">
+                        <div class="w-12 h-12 bg-gray-300 rounded-full border-2 border-white shadow-md ring-4 ring-[#2ecc71]"></div>
+                        <div>
+                            <h4 class="m-0 text-base font-semibold text-gray-800">Siswa Teladan</h4>
+                            <span class="text-xs font-bold text-[#2ecc71]" id="userLevel">level 2 <i class="bi bi-caret-right-fill"></i></span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col items-end">
+                        <div class="flex flex-wrap justify-center gap-3 text-sm text-gray-600">
+                            <span>Jawaban Benar <span id="statBenar" class="font-bold text-[#2ecc71]">0</span></span> | 
+                            <span>Salah <span id="statSalah" class="font-bold text-[#e74c3c]">0</span></span> | 
+                            <span>Total <span id="statTotal" class="font-bold text-[#34495e]">0</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    <div>
+                        <div class="bg-[#2ecc71] text-white p-4 rounded-lg font-bold mb-5 flex items-center gap-3">
+                            <div id="mapelFlag" class="flag-id"></div> 
+                            <span id="mapelTitle">Memuat Mapel...</span>
+                        </div>
+                        
+                        <div class="materi-options" id="materiListContainer">
+                            </div>
+                    </div>
+
+                    <div>
+                        <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                            <h5 class="text-sm text-gray-600 mb-2">Jumlah Soal</h5>
+                            <div class="flex gap-2">
+                                <button id="minSoal" class="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 font-bold hover:bg-gray-100">-</button>
+                                <input type="number" id="jumlahSoal" value="12" class="w-full p-2 border border-gray-300 rounded-md text-center text-gray-800 text-sm focus:outline-none focus:border-blue-400">
+                                <button id="plusSoal" class="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 font-bold hover:bg-gray-100">+</button>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                            <h5 class="text-sm text-gray-600 mb-2">Waktu Pengerjaan (Menit)</h5>
+                            <div class="flex gap-2 items-center">
+                                <button id="minWaktu" class="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 font-bold hover:bg-gray-100">-</button>
+                                <input type="number" id="waktuPengerjaan" value="20" class="w-full p-2 border border-gray-300 rounded-md text-center text-gray-800 text-sm focus:outline-none focus:border-blue-400">
+                                <span class="text-gray-700 text-sm w-16 text-center">Menit</span>
+                                <button id="plusWaktu" class="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 font-bold hover:bg-gray-100">+</button>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1 italic">*Isi 0 untuk tanpa waktu</p>
+                        </div>
+                        
+                        <div id="summaryInfo" class="text-center text-sm text-gray-600 mt-4 mb-6">
+                            Jumlah 12 Soal <br> Waktu 20 Menit
+                        </div>
+                        
+                        <button id="btnMulai" class="start-button w-full py-4 text-white font-bold text-lg rounded-xl shadow-lg transition-colors">Mulai</button>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =================================================
+        // === 1. DATA & INISIALISASI ===
+        // =================================================
+        
+        // Data Materi per Mapel
+        const DATA_MATERI = {
+            'bindo': {
+                title: "Bahasa Indonesia",
+                materi: ["Puisi", "Berita", "Teks Hasil Observasi", "Karya Tulis Ilmiah", "Resensi", "Drama"]
+            },
+            'bing': {
+                title: "Bahasa Inggris",
+                materi: ["Tenses", "Descriptive Text", "Narrative Text", "Recount Text", "Vocabulary", "Grammar"]
+            },
+            'mtk': {
+                title: "Matematika",
+                materi: ["Aljabar", "Geometri", "Statistika", "Peluang", "Trigonometri", "Kalkulus"]
+            },
+            'umum': {
+                title: "Pengetahuan Umum",
+                materi: ["Sejarah", "Geografi", "PKN", "Seni Budaya", "Olahraga", "Teknologi"]
+            }
+        };
+
+        // Ambil parameter URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentMapel = urlParams.get('mapel') || 'umum'; // Default umum
+
+        // Setup Tampilan Awal
+        document.addEventListener('DOMContentLoaded', () => {
+            const data = DATA_MATERI[currentMapel] || DATA_MATERI['umum'];
+            
+            // Set Judul Mapel
+            document.getElementById('mapelTitle').textContent = data.title;
+            
+            // --- LOAD STATISTIK DARI LOCAL STORAGE ---
+            const storageKey = 'arena_belajar_progress';
+            const savedData = JSON.parse(localStorage.getItem(storageKey)) || {};
+            
+            // Ambil data spesifik mapel ini, atau default 0
+            const mapelStats = savedData[currentMapel] || { total_benar: 0, total_salah: 0, total_soal: 0 };
+            
+            // Update UI Statistik
+            document.getElementById('statBenar').textContent = mapelStats.total_benar;
+            document.getElementById('statSalah').textContent = mapelStats.total_salah;
+            document.getElementById('statTotal').textContent = mapelStats.total_soal;
+
+            // Update Level (Total Global)
+            let totalBenarGlobal = 0;
+            for (let key in savedData) {
+                if (savedData[key].total_benar) totalBenarGlobal += savedData[key].total_benar;
+            }
+            const currentLevel = Math.floor(totalBenarGlobal / 10) + 1;
+            document.getElementById('userLevel').innerHTML = `level ${currentLevel} <i class="bi bi-caret-right-fill"></i>`;
+
+            // --- GENERATE CHECKBOX MATERI ---
+            const container = document.getElementById('materiListContainer');
+            
+            // Tambah tombol "Pilih Semua"
+            let html = `
+                <div class="option-item flex items-center p-3 rounded-lg bg-gray-50 mb-3 cursor-pointer border border-transparent transition-all hover:bg-gray-100" id="selectAllOption">
+                    <input type="checkbox" id="semuaMateri" class="form-checkbox h-5 w-5 text-[#2ecc71] rounded-md border-gray-300 focus:ring-0 mr-4">
+                    <label for="semuaMateri" class="text-gray-700 font-medium cursor-pointer flex-grow">Pilih Semua Materi</label>
+                </div>
+            `;
+
+            // Tambah materi individu
+            data.materi.forEach((item, index) => {
+                const id = `materi-${index}`;
+                html += `
+                    <div class="option-item materi-individual flex items-center p-3 rounded-lg bg-gray-50 mb-3 cursor-pointer border border-transparent transition-all hover:bg-gray-100">
+                        <input type="checkbox" id="${id}" name="materi" value="${item}" class="form-checkbox h-5 w-5 text-[#2ecc71] rounded-md border-gray-300 focus:ring-0 mr-4">
+                        <label for="${id}" class="text-gray-700 font-medium cursor-pointer flex-grow">${item}</label>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+
+            // Re-attach event listeners
+            attachCheckboxEvents();
+            updateSummary();
+        });
+
+
+        // =================================================
+        // === 2. LOGIKA INTERAKTIF ===
+        // =================================================
+
+        function attachCheckboxEvents() {
+            const selectAllCheckbox = document.getElementById('semuaMateri');
+            const materiCheckboxes = document.querySelectorAll('.materi-individual input[name="materi"]');
+            const selectAllItem = document.getElementById('selectAllOption');
+
+            function updateSelectAllStatus() {
+                const totalMateri = materiCheckboxes.length;
+                const checkedMateri = document.querySelectorAll('.materi-individual input[name="materi"]:checked').length;
+                const shouldBeChecked = totalMateri > 0 && checkedMateri === totalMateri;
+                
+                selectAllCheckbox.checked = shouldBeChecked;
+                toggleActiveClass(selectAllItem, shouldBeChecked);
+            }
+
+            function toggleActiveClass(item, isChecked) {
+                if (isChecked) {
+                    item.classList.add('border-[#2ecc71]', 'bg-emerald-50', 'hover:bg-emerald-100');
+                    item.classList.remove('border-transparent', 'bg-gray-50', 'hover:bg-gray-100');
+                } else {
+                    item.classList.remove('border-[#2ecc71]', 'bg-emerald-50', 'hover:bg-emerald-100');
+                    item.classList.add('border-transparent', 'bg-gray-50', 'hover:bg-gray-100');
+                }
+            }
+
+            // Event Pilih Semua
+            selectAllItem.addEventListener('click', (event) => {
+                if (event.target !== selectAllCheckbox && event.target.tagName !== 'LABEL') {
+                    selectAllCheckbox.checked = !selectAllCheckbox.checked;
+                }
+                const targetChecked = selectAllCheckbox.checked;
+                
+                materiCheckboxes.forEach(checkbox => {
+                    checkbox.checked = targetChecked;
+                    toggleActiveClass(checkbox.closest('.option-item'), targetChecked);
+                });
+                toggleActiveClass(selectAllItem, targetChecked);
+            });
+
+            // Event Pilih Individu
+            materiCheckboxes.forEach(checkbox => {
+                const item = checkbox.closest('.option-item');
+                item.addEventListener('click', (event) => {
+                    if (event.target !== checkbox && event.target.tagName !== 'LABEL') {
+                        checkbox.checked = !checkbox.checked;
+                    }
+                    toggleActiveClass(item, checkbox.checked);
+                    updateSelectAllStatus();
+                });
+            });
+        }
+
+        // Logic Counter Jumlah & Waktu
+        const jumlahSoalInput = document.getElementById('jumlahSoal');
+        const waktuPengerjaanInput = document.getElementById('waktuPengerjaan');
+        const summaryInfo = document.getElementById('summaryInfo');
+
+        function updateSummary() {
+            const soal = jumlahSoalInput.value;
+            const waktu = waktuPengerjaanInput.value;
+            const waktuText = waktu == 0 ? "Tanpa Waktu" : `Waktu ${waktu} Menit`;
+            summaryInfo.innerHTML = `Jumlah ${soal} Soal <br> ${waktuText}`;
+        }
+
+        // Event Listeners Counter
+        document.getElementById('minSoal').onclick = () => { if(jumlahSoalInput.value > 1) jumlahSoalInput.value--; updateSummary(); };
+        document.getElementById('plusSoal').onclick = () => { if(jumlahSoalInput.value < 100) jumlahSoalInput.value++; updateSummary(); };
+        jumlahSoalInput.onchange = () => updateSummary();
+
+        document.getElementById('minWaktu').onclick = () => { if(waktuPengerjaanInput.value > 0) waktuPengerjaanInput.value = parseInt(waktuPengerjaanInput.value) - 5; updateSummary(); };
+        document.getElementById('plusWaktu').onclick = () => { waktuPengerjaanInput.value = parseInt(waktuPengerjaanInput.value) + 5; updateSummary(); };
+        waktuPengerjaanInput.onchange = () => updateSummary();
+
+
+        // =================================================
+        // === 3. LOGIKA MULAI & REDIRECT ===
+        // =================================================
+        
+        document.getElementById('btnMulai').addEventListener('click', () => {
+            // 1. Ambil Materi yang dipilih
+            const checkedBoxes = document.querySelectorAll('.materi-individual input[name="materi"]:checked');
+            const selectedMateri = Array.from(checkedBoxes).map(cb => cb.value);
+
+            if (selectedMateri.length === 0) {
+                alert("Pilih setidaknya satu materi!");
+                return;
+            }
+
+            // 2. Ambil Pengaturan Lain
+            const jumlah = jumlahSoalInput.value;
+            let waktu = waktuPengerjaanInput.value;
+
+            // 3. Susun URL Parameter
+            const materiParam = selectedMateri.map(m => encodeURIComponent(m)).join(','); 
+            
+            let targetUrl = `s.html?mapel=${currentMapel}&materi=${materiParam}&jumlah=${jumlah}`;
+            
+            // Jika waktu > 0, tambahkan ke URL. Jika 0, jangan kirim (sesuai request)
+            if (parseInt(waktu) > 0) {
+                targetUrl += `&waktu=${waktu}`;
+            }
+
+            // 4. Redirect
+            window.location.href = targetUrl;
+        });
+
+
+        // --- Background Animation Script ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('backgroundContainer');
+            const iconClasses = ['bi-eyeglasses', 'bi-eraser', 'bi-pencil', 'bi-book-half']; 
+            for (let i = 0; i < 50; i++) {
+                const iconElement = document.createElement('i');
+                iconElement.classList.add('icon', 'bi', iconClasses[Math.floor(Math.random() * iconClasses.length)]);
+                iconElement.style.left = Math.random() * 100 + '%';
+                iconElement.style.top = Math.random() * 100 + '%';
+                iconElement.style.animationDuration = (15 + Math.random() * 10) + 's';
+                iconElement.style.setProperty('--dx', (Math.random() - 0.5) * 100 + 'px');
+                iconElement.style.setProperty('--dy', (Math.random() - 0.5) * 100 + 'px');
+                container.appendChild(iconElement);
+            }
+        });
+
+    </script>
+</body>
+</html>

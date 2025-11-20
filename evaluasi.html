@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hasil Pertarungan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .arena-bg { 
+            background-image: url('bgarena.png'); 
+            background-color: #e0f2fe; 
+            background-position: bottom center; 
+            background-size: cover;
+            background-repeat: no-repeat; 
+            min-height: 100vh; 
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 2px solid white;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        /* Animasi Pop In */
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .animate-pop { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    </style>
+</head>
+<body class="arena-bg flex items-center justify-center p-4">
+
+    <div class="glass-panel w-full max-w-lg rounded-3xl p-8 text-center animate-pop relative overflow-hidden">
+        
+        <div id="status-header" class="mb-6">
+            <div id="status-icon" class="text-6xl mb-2">🏆</div>
+            <h1 id="status-title" class="text-3xl font-black text-gray-800 uppercase tracking-wider">HASIL EVALUASI</h1>
+            <p id="status-desc" class="text-gray-500 font-medium">Laporan sesi latihan kamu</p>
+        </div>
+
+        <div class="mb-8 relative">
+            <div class="text-sm text-gray-400 font-bold mb-1 tracking-widest">NILAI AKHIR</div>
+            <div id="score-text" class="text-7xl font-black text-blue-600 drop-shadow-sm">0</div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <div class="bg-green-50 border border-green-200 p-4 rounded-2xl">
+                <div class="text-3xl font-bold text-green-600" id="correct-text">0</div>
+                <div class="text-xs text-green-800 font-bold uppercase">Jawaban Benar</div>
+            </div>
+            <div class="bg-red-50 border border-red-200 p-4 rounded-2xl">
+                <div class="text-3xl font-bold text-red-600" id="wrong-text">0</div>
+                <div class="text-xs text-red-800 font-bold uppercase">Jawaban Salah</div>
+            </div>
+        </div>
+
+        <div class="bg-gray-100 rounded-xl p-3 mb-8 text-xs text-gray-500">
+            Mapel: <span id="mapel-name" class="font-bold text-gray-700 uppercase">UNKNOWN</span> | 
+            Total Riwayat: <span id="total-history" class="font-bold text-gray-700">0</span> Soal
+        </div>
+
+        <div class="space-y-3">
+            <button onclick="replayGame()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-600/30 transition transform active:scale-95">
+                🔄 Ulangi Materi Ini
+            </button>
+            
+            <a href="index.html" class="block w-full py-3 bg-white border-2 border-gray-200 hover:bg-gray-50 text-gray-700 font-bold rounded-xl transition transform active:scale-95">
+                🏠 Kembali ke Home
+            </a>
+        </div>
+
+    </div>
+
+    <script>
+        // 1. AMBIL DATA DARI URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const mapel = urlParams.get('mapel') || '-';
+        const benar = parseInt(urlParams.get('benar')) || 0;
+        const salah = parseInt(urlParams.get('salah')) || 0;
+        const skor = parseInt(urlParams.get('skor')) || 0;
+        const status = urlParams.get('status'); // 'win', 'lose', 'timeout'
+
+        // 2. AMBIL DATA RIWAYAT DARI LOCALSTORAGE
+        const storageKey = 'arena_belajar_progress';
+        const savedData = JSON.parse(localStorage.getItem(storageKey)) || {};
+        const mapelData = savedData[mapel] || { total_soal: 0 };
+
+        // 3. ISI KONTEN HTML
+        document.getElementById('score-text').textContent = skor;
+        document.getElementById('correct-text').textContent = benar;
+        document.getElementById('wrong-text').textContent = salah;
+        document.getElementById('mapel-name').textContent = mapel;
+        document.getElementById('total-history').textContent = mapelData.total_soal;
+
+        // 4. ATUR TAMPILAN BERDASARKAN STATUS MENANG/KALAH
+        const iconEl = document.getElementById('status-icon');
+        const titleEl = document.getElementById('status-title');
+        const scoreEl = document.getElementById('score-text');
+
+        if (status === 'timeout') {
+            iconEl.textContent = '⌛';
+            titleEl.textContent = 'WAKTU HABIS';
+            titleEl.className = "text-3xl font-black text-orange-500 uppercase tracking-wider";
+            scoreEl.className = "text-7xl font-black text-orange-500 drop-shadow-sm";
+        } else if (status === 'lose') {
+            iconEl.textContent = '💀';
+            titleEl.textContent = 'GAME OVER';
+            titleEl.className = "text-3xl font-black text-gray-600 uppercase tracking-wider";
+            scoreEl.className = "text-7xl font-black text-gray-600 drop-shadow-sm";
+        } else {
+            iconEl.textContent = '🎉';
+            titleEl.textContent = 'LUAR BIASA!';
+            titleEl.className = "text-3xl font-black text-blue-600 uppercase tracking-wider";
+        }
+
+        // 5. FUNGSI REPLAY
+        function replayGame() {
+            // Kembali ke halaman game dengan parameter yang sama (reload logic)
+            // Kita perlu 'history.back()' tapi lebih aman arahkan ulang ke index dengan parameter mapel
+            // Namun karena URL index.html dinamis, kita bisa pakai history browser jika memungkinkan, 
+            // atau arahkan manual ke index.html?mapel=...
+            window.history.back();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Final - Dropdown Logic</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Poppins', 'sans-serif'] },
+                    colors: {
+                        'brand-blue': '#007AFF',
+                        'card-green': '#9EF081',
+                        'card-yellow': '#FFF59D',
+                        'card-red': '#FFAB91',
+                        'card-blue': '#90CAF9',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .background-container {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 0; overflow: hidden;
+        }
+        .icon {
+            position: absolute; font-size: 24px; color: rgba(0, 122, 255, 0.15);
+            opacity: 0.6; user-select: none; animation: float 20s infinite ease-in-out alternate;
+        }
+        @keyframes float {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            50% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+
+        .icon-bubble {
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), rgba(255,255,255,0.1));
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05), inset 0 -3px 5px rgba(0,0,0,0.1);
+            border: 2px solid rgba(255,255,255,0.6);
+        }
+
+        .curve-top-connector {
+            position: absolute; bottom: 0; left: -40px; width: 40px; height: 40px;
+            background: transparent; z-index: 20; overflow: hidden; pointer-events: none; display: none; 
+        }
+        .curve-top-connector::after {
+            content: ''; position: absolute; bottom: 0; right: 0; width: 80px; height: 80px;
+            background: transparent; border-radius: 50%; box-shadow: 40px 40px 0 0 #ffffff;
+        }
+        .curve-bottom-connector {
+            position: absolute; width: 30px; height: 30px;
+            background: transparent; z-index: 20; overflow: hidden; pointer-events: none; display: none; 
+        }
+        .curve-bottom-connector::after {
+            content: ''; position: absolute; top: 0; right: 0; width: 60px; height: 60px; 
+            background: transparent; border-radius: 50%; box-shadow: 30px -30px 0 0 #ffffff;
+        }
+
+        @media (min-width: 768px) {
+            .curve-top-connector, .curve-bottom-connector { display: block; }
+            .header-blue-padding-fix { padding-bottom: 5rem; }
+        }
+
+        /* Dropdown Animation */
+        .dropdown-menu {
+            transition: all 0.2s ease-in-out;
+            transform-origin: top left;
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
+        }
+        .dropdown-menu.active {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+
+        /* Toast Notification Animation */
+        #customToast {
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        .toast-hidden {
+            transform: translate(-50%, -100px); /* Di atas layar */
+            opacity: 0;
+        }
+        .toast-visible {
+            transform: translate(-50%, 20px); /* Muncul sedikit ke bawah */
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-[#EAF4FF] min-h-screen font-sans text-gray-700 relative">
+
+    <div class="background-container" id="backgroundContainer"></div>
+
+    <div id="customToast" class="fixed top-0 left-1/2 z-[100] toast-hidden flex items-center gap-3 bg-gray-800 text-white px-6 py-3.5 rounded-full shadow-2xl pointer-events-none">
+        <div class="bg-yellow-500 w-6 h-6 rounded-full flex items-center justify-center text-gray-900 text-xs">
+            <i class="fa-solid fa-lock"></i>
+        </div>
+        <span class="font-medium text-sm">Maaf, pilihan ini belum tersedia.</span>
+    </div>
+
+    <div class="relative z-10 w-full md:max-w-[900px] mx-auto md:my-12">
+        
+        <div class="bg-white md:bg-transparent md:rounded-[40px] overflow-visible min-h-screen md:min-h-0 relative">
+
+            <div class="bg-brand-blue pt-10 pb-20 px-6 md:px-12 relative md:rounded-[40px] shadow-xl header-blue-padding-fix">
+                
+                <div class="bg-white rounded-full py-3 px-5 md:px-6 flex items-center justify-between shadow-md mb-6 max-w-2xl w-full md:w-auto mx-auto md:mx-0">
+                    <div class="flex items-center gap-4 flex-grow">
+                        <div class="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-2xl flex-shrink-0">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div class="flex flex-col w-full max-w-[200px] md:max-w-xs">
+                            <h3 class="font-bold text-gray-700 text-sm md:text-base border-b-2 border-gray-300 pb-1 truncate">
+                                Siswa Teladan
+                            </h3>
+                            <p class="text-sm text-brand-blue font-bold mt-1 flex items-center">
+                                <span id="userLevelText">Level 1</span> <i class="fa-solid fa-sun text-yellow-400 ml-1 animate-pulse"></i>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 md:gap-6 border-l-0 md:border-l pl-0 md:pl-6 border-gray-200 ml-2">
+                        <div class="text-center">
+                            <span id="totalBenarGlobal" class="text-[#4CD964] font-bold text-xl leading-none block">0</span>
+                            <span class="text-[#4CD964] text-[10px] font-semibold uppercase">Benar</span>
+                        </div>
+                        <div class="h-8 w-[1px] bg-gray-300"></div>
+                        <div class="text-center">
+                            <span id="totalSalahGlobal" class="text-[#FF3B30] font-bold text-xl leading-none block">0</span>
+                            <span class="text-[#FF3B30] text-[10px] font-semibold uppercase">Salah</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="relative z-50 flex gap-3 md:mt-8">
+                    
+                    <div class="relative inline-block text-left">
+                        <button onclick="toggleDropdown('dropdownKelas')" class="bg-white text-gray-700 px-6 py-2.5 rounded-full text-sm font-bold shadow-sm flex items-center hover:bg-gray-50 transition w-full md:w-auto justify-between md:justify-start">
+                            <span><i class="fa-solid fa-chevron-down mr-2 text-xs text-gray-500"></i> <span id="textKelas">Kelas 11</span></span>
+                        </button>
+
+                        <div id="dropdownKelas" class="dropdown-menu absolute left-0 mt-2 w-56 rounded-2xl shadow-xl bg-white ring-1 ring-black ring-opacity-5 focus:outline-none overflow-hidden max-h-80 overflow-y-auto custom-scrollbar">
+                            <div class="bg-gray-50 px-4 py-2 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider sticky top-0">SD</div>
+                            <a href="#" onclick="selectKelas('Kelas 1')" class="block px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-brand-blue transition-colors">Kelas 1</a>
+                            <div class="bg-gray-50 px-4 py-2 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider sticky top-0 border-t">SMA / SMK</div>
+                            <a href="#" onclick="selectKelas('Kelas 11')" class="block px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-brand-blue transition-colors font-bold bg-blue-50 text-brand-blue">Kelas 11</a>
+                        </div>
+                    </div>
+
+                    <div class="relative inline-block text-left">
+                        <button onclick="toggleDropdown('dropdownKurikulum')" class="bg-white text-gray-800 px-6 py-2.5 rounded-full text-sm font-bold shadow-sm flex items-center hover:bg-gray-50 transition w-full md:w-auto justify-between md:justify-start">
+                            <span><i class="fa-solid fa-chevron-down mr-2 text-xs text-gray-500"></i> <span id="textKurikulum">Merdeka</span></span>
+                        </button>
+                        <div id="dropdownKurikulum" class="dropdown-menu absolute left-0 mt-2 w-48 rounded-2xl shadow-xl bg-white ring-1 ring-black ring-opacity-5 focus:outline-none overflow-hidden">
+                            <a href="#" onclick="selectKurikulum('Merdeka')" class="block px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-brand-blue transition-colors font-bold bg-blue-50 text-brand-blue">Kurikulum Merdeka</a>
+                            <a href="#" onclick="selectKurikulum('K-13')" class="block px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-brand-blue transition-colors">Kurikulum 2013</a>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="bg-white relative z-10 w-full md:w-[95%] md:mx-auto rounded-[30px] md:rounded-tr-none mt-[-40px] min-h-[600px] md:min-h-0 md:mb-10 shadow-2xl md:shadow-none p-6 md:p-8">
+                
+                <div class="hidden md:block absolute -top-[60px] right-0 w-[55%] h-[60px]">
+                    <div class="w-full h-full bg-white rounded-tr-[30px] rounded-tl-[30px] flex items-center justify-center relative pl-6 shadow-none">
+                        <div class="curve-top-connector"></div>
+                        <h2 class="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500 italic font-extrabold text-xl tracking-wide relative z-30">
+                            Mau Latihan Apa Hari Ini? <span class="text-yellow-400 not-italic">✨</span>
+                        </h2>
+                        <div class="curve-bottom-connector" style="bottom: -30px; left: -30px;"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-5 md:pt-4">
+                    
+                    <div onclick="startGame('bindo')" class="bg-card-green rounded-[35px] p-4 md:px-6 flex items-center justify-between shadow-sm hover:scale-[1.01] transition cursor-pointer group">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 icon-bubble rounded-full flex items-center justify-center text-2xl shadow-sm">🇮🇩</div>
+                            <div>
+                                <h4 class="font-bold text-[#333] text-lg tracking-tight">Bahasa Indonesia</h4>
+                                <p class="text-xs text-gray-600 font-medium mt-0.5">Statistik Kamu:</p>
+                                <div class="text-sm mt-0.5 font-bold flex items-center gap-2">
+                                    <span class="text-green-700 flex items-center"><i class="fa-solid fa-circle-check mr-1"></i> <span id="bindo-benar">0</span></span>
+                                    <span class="text-red-500 flex items-center"><i class="fa-solid fa-circle-xmark mr-1"></i> <span id="bindo-salah">0</span></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-[#3C3C3C] text-white flex items-center justify-center shadow-md group-hover:bg-black transition">
+                            <i class="fa-solid fa-arrow-right text-sm"></i>
+                        </div>
+                    </div>
+
+                    <div onclick="startGame('bing')" class="bg-card-yellow rounded-[35px] p-4 md:px-6 flex items-center justify-between shadow-sm hover:scale-[1.01] transition cursor-pointer group">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 icon-bubble rounded-full flex items-center justify-center text-2xl shadow-sm">🇬🇧</div>
+                            <div>
+                                <h4 class="font-bold text-[#333] text-lg tracking-tight">Bahasa Inggris</h4>
+                                <p class="text-xs text-gray-600 font-medium mt-0.5">Statistik Kamu:</p>
+                                <div class="text-sm mt-0.5 font-bold flex items-center gap-2">
+                                    <span class="text-green-700 flex items-center"><i class="fa-solid fa-circle-check mr-1"></i> <span id="bing-benar">0</span></span>
+                                    <span class="text-red-500 flex items-center"><i class="fa-solid fa-circle-xmark mr-1"></i> <span id="bing-salah">0</span></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-[#3C3C3C] text-white flex items-center justify-center shadow-md group-hover:bg-black transition">
+                            <i class="fa-solid fa-arrow-right text-sm"></i>
+                        </div>
+                    </div>
+
+                    <div onclick="startGame('mtk')" class="bg-card-red rounded-[35px] p-4 md:px-6 flex items-center justify-between shadow-sm hover:scale-[1.01] transition cursor-pointer group">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 icon-bubble rounded-full flex items-center justify-center text-2xl shadow-sm">🔢</div>
+                            <div>
+                                <h4 class="font-bold text-[#333] text-lg tracking-tight">Matematika</h4>
+                                <p class="text-xs text-gray-700 font-medium mt-0.5">Statistik Kamu:</p>
+                                <div class="text-sm mt-0.5 font-bold flex items-center gap-2">
+                                    <span class="text-green-800 flex items-center"><i class="fa-solid fa-circle-check mr-1"></i> <span id="mtk-benar">0</span></span>
+                                    <span class="text-red-800 flex items-center"><i class="fa-solid fa-circle-xmark mr-1"></i> <span id="mtk-salah">0</span></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-[#3C3C3C] text-white flex items-center justify-center shadow-md group-hover:bg-black transition">
+                            <i class="fa-solid fa-arrow-right text-sm"></i>
+                        </div>
+                    </div>
+
+                    <div onclick="startGame('umum')" class="bg-card-blue rounded-[35px] p-4 md:px-6 flex items-center justify-between shadow-sm hover:scale-[1.01] transition cursor-pointer group">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 icon-bubble rounded-full flex items-center justify-center text-2xl shadow-sm">🌍</div>
+                            <div>
+                                <h4 class="font-bold text-[#333] text-lg tracking-tight">Umum</h4>
+                                <p class="text-xs text-gray-600 font-medium mt-0.5">Statistik Kamu:</p>
+                                <div class="text-sm mt-0.5 font-bold flex items-center gap-2">
+                                    <span class="text-green-700 flex items-center"><i class="fa-solid fa-circle-check mr-1"></i> <span id="umum-benar">0</span></span>
+                                    <span class="text-red-600 flex items-center"><i class="fa-solid fa-circle-xmark mr-1"></i> <span id="umum-salah">0</span></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-[#3C3C3C] text-white flex items-center justify-center shadow-md group-hover:bg-black transition">
+                            <i class="fa-solid fa-arrow-right text-sm"></i>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. TOAST NOTIFICATION LOGIC ---
+        let toastTimeout;
+        function showToast(message) {
+            const toast = document.getElementById('customToast');
+            const toastText = toast.querySelector('span');
+            
+            toastText.innerText = message;
+            
+            // Reset class untuk trigger animasi ulang
+            toast.classList.remove('toast-hidden');
+            toast.classList.add('toast-visible');
+
+            // Clear timeout lama jika user klik cepat
+            clearTimeout(toastTimeout);
+
+            // Sembunyikan setelah 3 detik
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('toast-visible');
+                toast.classList.add('toast-hidden');
+            }, 2500);
+        }
+
+        // --- 2. DROPDOWN LOGIC (DENGAN RESTRIKSI) ---
+        
+        function toggleDropdown(id) {
+            const dropdown = document.getElementById(id);
+            const allDropdowns = document.querySelectorAll('.dropdown-menu');
+            allDropdowns.forEach(d => {
+                if(d.id !== id) d.classList.remove('active');
+            });
+            dropdown.classList.toggle('active');
+        }
+
+        function selectKelas(value) {
+            if (value === 'Kelas 11') {
+                // Jika Kelas 11, izinkan
+                document.getElementById('textKelas').innerText = value;
+                toggleDropdown('dropdownKelas');
+            } else {
+                // Jika bukan, tolak dan munculkan notifikasi
+                showToast("Maaf, materi kelas ini belum tersedia.");
+                toggleDropdown('dropdownKelas'); // Tutup dropdown agar rapi
+            }
+        }
+
+        function selectKurikulum(value) {
+            if (value === 'Merdeka') {
+                // Jika Merdeka, izinkan
+                document.getElementById('textKurikulum').innerText = value;
+                toggleDropdown('dropdownKurikulum');
+            } else {
+                // Jika bukan, tolak dan munculkan notifikasi
+                showToast("Maaf, kurikulum ini belum tersedia.");
+                toggleDropdown('dropdownKurikulum');
+            }
+        }
+
+        // Tutup dropdown jika klik di luar
+        window.onclick = function(event) {
+            if (!event.target.closest('.relative.inline-block')) {
+                const dropdowns = document.getElementsByClassName("dropdown-menu");
+                for (let i = 0; i < dropdowns.length; i++) {
+                    const openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('active')) {
+                        openDropdown.classList.remove('active');
+                    }
+                }
+            }
+        }
+
+        // --- 3. INTEGRASI DATA & LAINNYA (Sama seperti sebelumnya) ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // -- Logic Background --
+            const container = document.getElementById('backgroundContainer');
+            const iconClasses = ['bi-eyeglasses', 'bi-eraser', 'bi-pencil', 'bi-book-half', 'bi-calculator', 'bi-globe']; 
+            const isMobile = window.innerWidth < 768;
+            const totalIcons = isMobile ? 30 : 60; 
+            const maxOffset = 50; const maxRotation = 30; 
+
+            for (let i = 0; i < totalIcons; i++) {
+                const iconElement = document.createElement('i');
+                iconElement.classList.add('icon', 'bi', iconClasses[Math.floor(Math.random() * iconClasses.length)]);
+                iconElement.style.left = `${Math.random() * 100}%`;
+                iconElement.style.top = `${Math.random() * 100}%`;
+                const duration = 15 + Math.random() * 10;
+                iconElement.style.animationDuration = `${duration}s`;
+                iconElement.style.animationDelay = `${Math.random() * -15}s`;
+                iconElement.style.setProperty('--dx', `${(Math.random() - 0.5) * 2 * maxOffset}px`);
+                iconElement.style.setProperty('--dy', `${(Math.random() - 0.5) * 2 * maxOffset}px`);
+                iconElement.style.setProperty('--rot', `${(Math.random() - 0.5) * 2 * maxRotation}deg`);
+                container.appendChild(iconElement);
+            }
+
+            // -- Logic Data LocalStorage --
+            const storageKey = 'arena_belajar_progress';
+            const savedData = JSON.parse(localStorage.getItem(storageKey)) || {};
+
+            const getStats = (mapel) => {
+                if (savedData[mapel]) {
+                    return savedData[mapel];
+                }
+                return { total_benar: 0, total_salah: 0 };
+            };
+
+            const dataBindo = getStats('bindo');
+            const dataBing = getStats('bing');
+            const dataMtk = getStats('mtk');
+            const dataUmum = getStats('umum');
+
+            document.getElementById('bindo-benar').innerText = dataBindo.total_benar;
+            document.getElementById('bindo-salah').innerText = dataBindo.total_salah;
+            document.getElementById('bing-benar').innerText = dataBing.total_benar;
+            document.getElementById('bing-salah').innerText = dataBing.total_salah;
+            document.getElementById('mtk-benar').innerText = dataMtk.total_benar;
+            document.getElementById('mtk-salah').innerText = dataMtk.total_salah;
+            document.getElementById('umum-benar').innerText = dataUmum.total_benar;
+            document.getElementById('umum-salah').innerText = dataUmum.total_salah;
+
+            const totalBenar = dataBindo.total_benar + dataBing.total_benar + dataMtk.total_benar + dataUmum.total_benar;
+            const totalSalah = dataBindo.total_salah + dataBing.total_salah + dataMtk.total_salah + dataUmum.total_salah;
+
+            document.getElementById('totalBenarGlobal').innerText = totalBenar;
+            document.getElementById('totalSalahGlobal').innerText = totalSalah;
+
+            const currentLevel = Math.floor(totalBenar / 10) + 1;
+            document.getElementById('userLevelText').innerText = "Level " + currentLevel;
+        });
+
+        function startGame(mapel) {
+            window.location.href = `materi.html?mapel=${mapel}`;
+        }
+    </script>
+</body>
+</html>
